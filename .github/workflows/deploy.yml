@@ -225,9 +225,9 @@ jobs:
         env:
           COVERITY_INTERMEDIATE_DIR: idir # Coverity 중간 디렉토리
         run: |
-          if (-not (Test-Path $env:MSBUILD_PATH)) {
-            Write-Error "ERROR: MSBuild 경로를 찾을 수 없습니다."; exit 1 }
-          New-Item -ItemType Directory -Path $env:COVERITY_INTERMEDIATE_DIR -Force | Out-Null          
+          # if (-not (Test-Path $env:MSBUILD_PATH)) {
+          #   Write-Error "ERROR: MSBuild 경로를 찾을 수 없습니다."; exit 1 }
+          # New-Item -ItemType Directory -Path $env:COVERITY_INTERMEDIATE_DIR -Force | Out-Null          
           
           # -----------------------------------------------------
           # 수정된 부분: MSBuild 명령어 문자열
@@ -235,8 +235,8 @@ jobs:
           # -----------------------------------------------------
           $buildCommandString = "`"$env:MSBUILD_PATH`" GitHub_VS2022_Test_Project.sln /p:Configuration=`"Release`" /t:Rebuild"
           
-          $covBuildLogOutput = "cov_build_stdout.log"
-          $covBuildLogError = "cov_build_stderr.log"
+          # $covBuildLogOutput = "cov_build_stdout.log"
+          # $covBuildLogError = "cov_build_stderr.log"
 
           try {
               Write-Host "Coverity 빌드 캡처 시작..."
@@ -247,8 +247,8 @@ jobs:
                                 $buildCommandString
                             ) `
                             -Wait -NoNewWindow `
-                            -RedirectStandardOutput $covBuildLogOutput `
-                            -RedirectStandardError $covBuildLogError `
+                            # -RedirectStandardOutput $covBuildLogOutput `
+                            # -RedirectStandardError $covBuildLogError `
                             | Out-Null
               $exitCode = $LASTEXITCODE
           } catch {
