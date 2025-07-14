@@ -232,24 +232,6 @@ jobs:
           
           # MSBuild 명령어 문자열
           # $buildCommandString = "`"$env:MSBUILD_PATH`" GitHub_VS2022_Test_Project.sln /p:Configuration=`"Release`" /t:Rebuild "
-          
-          # -----------------------------------------------------
-          # 수정된 부분: 로그 관련 변수 및 리다이렉션 완전히 삭제
-          # 오직 cov-build 명령어 실행만 남김
-          # -----------------------------------------------------
-          Write-Host "Coverity 빌드 캡처 시작..."
-          # try {
-          #     Start-Process -FilePath "C:\Program Files\Coverity\bin\cov-build.exe" `
-          #                   -ArgumentList @(
-          #                       "--dir",
-          #                       "${{ env.COVERITY_INTERMEDIATE_DIR }}",
-          #                       "`"$env:MSBUILD_PATH`" GitHub_VS2022_Test_Project.sln /p:Configuration=`"Release`" /t:Rebuild" # $buildCommandString 대신 직접 삽입
-          #                   ) `
-          #                   -Wait -NoNewWindow `
-          #                   | Out-Null # Start-Process 객체가 로그에 출력되는 것을 방지
-          #     $exitCode = $LASTEXITCODE
-          # } catch {
-          #     Write-Error "ERROR: cov-build 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999 }
 
           $buildCommand = "$env:MSBUILD_PATH"
           $buildArgs = @(
@@ -289,6 +271,71 @@ jobs:
           Write-Host "Coverity 분석 완료. (종료 코드: $exitCode)"
 
 
+      # Coverity JSON 결과 생성 (SARIF 변환을 위해 필요)
+      - name: Generate Coverity JSON Report
+        shell: pwsh
+        env:
+          COVERITY_INTERMEDIATE_DIR: idir
+        run: |
+          Write-Host "Coverity JSON 결과 생성 시작..."
+          try {
+              Start-Process -FilePath "C:\Program Files\Coverity\bin\cov-format-errors.exe" `
+                              -ArgumentList @(
+                                  "--dir", "${{ env.COVERITY_INTERMEDIATE_DIR }}",
+                                  "--json-output-v10",
+                                  "--output-file", "coverity_results.json" # SARIF 스크립트의 입력 파일
+                              ) `
+                              -Wait -NoNewWindow `
+                              | Out-Null
+              $exitCode = $LASTEXITCODE
+          } catch {
+              Write-Error "ERROR: cov-format-errors 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999
+          }
+          Write-Host "Coverity JSON 결과 생성 완료. (종료 코드: $exitCode)"
+
+
+      # Coverity JSON을 GitHub용 SARIF로 변환
+      - name: Convert Coverity JSON to SARIF for GitHub
+        shell: pwsh
+        run: |
+          # Coverity Node.js 실행 파일 및 SARIF 스크립트 경로
+          # 실제 Coverity 설치 경로에 맞춰 수정해주세요.
+          # 기본 설치 경로를 가정합니다.
+          $nodeExePath = "C:\Program Files\Coverity\Coverity Static Analysis\node\node.exe"
+          $sarifScriptPath = "C:\Program Files\Coverity\Coverity Static Analysis\SARIF\cov-format-sarif-for-github.js"
+          
+          # SARIF 스크립트 입력 및 출력 파일 이름
+          $sarifInputFile = "coverity_results.json" # cov-format-errors에서 생성된 파일
+          $sarifOutputFile = "coverity-results.sarif"
+          
+          # GitHub 저장소 정보 (환경 변수 사용)
+          $repoName = "${{ github.repository }}" # 예: 'bunt-k/Ctest'
+          $checkoutPath = "${{ github.workspace }}" # 소스 코드가 체크아웃된 경로
+          $commitHash = "${{ github.sha }}" # 현재 커밋 해시
+
+          Write-Host "Coverity JSON을 SARIF로 변환 시작..."
+          try {
+              # PowerShell의 '--%' (stop-parsing) 기호를 사용하여 node.exe에 인수를 정확히 전달
+              # 이렇게 하면 PowerShell이 인수를 잘못 해석하는 것을 방지합니다.
+              & $nodeExePath --% $sarifScriptPath `
+                  --inputFile $sarifInputFile `
+                  --outputFile $sarifOutputFile `
+                  --githubUrl "https://github.com" `
+                  --repoName $repoName `
+                  --checkoutPath $repoName $checkoutPath $commitHash
+              $exitCode = $LASTEXITCODE
+          } catch {
+              Write-Error "ERROR: cov-format-sarif-for-github.js 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999
+          }
+          Write-Host "SARIF 변환 완료. (종료 코드: $exitCode)"
+
+      # SARIF 파일을 GitHub Code Scanning에 업로드
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: coverity-results.sarif # 위 단계에서 생성된 SARIF 파일 경로
+          
+
       # Coverity Commit Defects 실행
       - name: Coverity Commit Defects
         shell: pwsh
@@ -312,26 +359,4 @@ jobs:
               Write-Error "ERROR: cov-commit-defects 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999 }
           
           Write-Host "Coverity 결함 커밋 완료. (종료 코드: $exitCode)"
-
-      - name: Black Duck SCA scan
-        uses: blackduck-inc/black-duck-security-scan@805cbd09e806b01907bbea0f990723c2bb85abe9
-        with:
-          ### ---------- BLACKDUCK SCA SCANNING: REQUIRED FIELDS ----------
-          blackducksca_url: ${{ vars.BLACKDUCKSCA_URL }}
-          blackducksca_token: ${{ secrets.BLACKDUCKSCA_TOKEN }}
-
-          ### ---------- COVERITY SCANNING: REQUIRED FIELDS ----------
-          coverity_url: ${{ vars.COVERITY_URL }}
-          coverity_user: ${{ secrets.COVERITY_USER }}
-          coverity_passphrase: ${{ secrets.COVERITY_PASSPHRASE }}
-
-          ### ---------- POLARIS SCANNING: REQUIRED FIELDS ----------
-          polaris_server_url: ${{ vars.POLARIS_SERVER_URL }}
-          polaris_access_token: ${{ secrets.POLARIS_ACCESS_TOKEN }}
-          polaris_assessment_types: "SCA,SAST"
-
-          ### ---------- SRM SCANNING: REQUIRED FIELDS ----------
-          srm_url: ${{ vars.SRM_URL }}
-          srm_apikey: ${{ secrets.SRM_API_KEY }}
-          srm_assessment_types: "SCA,SAST"
 
