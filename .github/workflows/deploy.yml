@@ -268,7 +268,57 @@ jobs:
           Write-Host "Coverity 빌드 캡처 완료. (종료 코드: $exitCode)"
 
 
-
+      # Coverity Analyze 실행
+      - name: Coverity Analyze
+        shell: pwsh
+        env:
+          COVERITY_INTERMEDIATE_DIR: idir # Coverity 중간 디렉토리
+        run: |
+          Write-Host "Coverity 분석 시작..."
+          try {
+              Start-Process -FilePath "C:\Program Files\Coverity\bin\cov-analyze.exe" `
+                            -ArgumentList "--dir", "${{ env.COVERITY_INTERMEDIATE_DIR }}" `
+                            -Wait -NoNewWindow `
+                            | Out-Null
+              $exitCode = $LASTEXITCODE
+          } catch {
+              Write-Error "ERROR: cov-analyze 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999 }
           
+          if ($exitCode -ne 0) {
+              Write-Error "ERROR: Coverity 분석 실패. 종료 코드: $exitCode"
+              exit 1 }
+          Write-Host "Coverity 분석 완료. (종료 코드: $exitCode)"
+
+
+      # Coverity Commit Defects 실행
+      - name: Coverity Commit Defects
+        shell: pwsh
+        env:
+          COVERITY_INTERMEDIATE_DIR: idir # Coverity 중간 디렉토리
+        run: |
+          Write-Host "Coverity 결함 커밋 시작..."
+          try {
+              Start-Process -FilePath "C:\Program Files\Coverity\bin\cov-commit-defects.exe" `
+                            -ArgumentList @(
+                                "--dir", "${{ env.COVERITY_INTERMEDIATE_DIR }}",
+                                "--url", "https://coverity.smsolus.com",
+                                "--user", "admin",
+                                "--password", "${{ secrets.COVERITY_CONNECT_PW }}", # <-- 여기 수정됨
+                                "--stream", "github-VS2022"
+                            ) `
+                            -Wait -NoNewWindow `
+                            | Out-Null
+              $exitCode = $LASTEXITCODE
+          } catch {
+              Write-Error "ERROR: cov-commit-defects 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999 }
+          
+          if ($exitCode -ne 0) {
+              Write-Error "ERROR: Coverity 결함 커밋 실패. 종료 코드: $exitCode"
+              exit 1 }
+          Write-Host "Coverity 결함 커밋 완료. (종료 코드: $exitCode)"
+
+
 
           #  msbuild GitHub_VS2022_Test_Project.sln /p:Configuration=Release /t:Rebuild
+          # env:
+          # COVERITY_LICENSE_CONTENT: ${{ secrets.COVERITY_ANALYSIS_LICENSE }}
