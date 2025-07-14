@@ -226,45 +226,68 @@ jobs:
         env:
           COVERITY_INTERMEDIATE_DIR: idir # Coverity 중간 디렉토리
         run: |
-          # MSBuild 경로 확인
-          if (-not (Test-Path $env:MSBUILD_PATH)) {
-            Write-Error "ERROR: MSBuild 경로를 찾을 수 없습니다."; exit 1 }
+      #     # MSBuild 경로 확인
+      #     if (-not (Test-Path $env:MSBUILD_PATH)) {
+      #       Write-Error "ERROR: MSBuild 경로를 찾을 수 없습니다."; exit 1 }
           
-          # MSBuild 명령어 문자열
-          # $buildCommandString = "`"$env:MSBUILD_PATH`" GitHub_VS2022_Test_Project.sln /p:Configuration=`"Release`" /t:Rebuild "
+      #     # MSBuild 명령어 문자열
+      #     # $buildCommandString = "`"$env:MSBUILD_PATH`" GitHub_VS2022_Test_Project.sln /p:Configuration=`"Release`" /t:Rebuild "
           
-          # -----------------------------------------------------
-          # 수정된 부분: 로그 관련 변수 및 리다이렉션 완전히 삭제
-          # 오직 cov-build 명령어 실행만 남김
-          # -----------------------------------------------------
+      #     # -----------------------------------------------------
+      #     # 수정된 부분: 로그 관련 변수 및 리다이렉션 완전히 삭제
+      #     # 오직 cov-build 명령어 실행만 남김
+      #     # -----------------------------------------------------
+      #     Write-Host "Coverity 빌드 캡처 시작..."
+      #     try {
+      #         Start-Process -FilePath "C:\Program Files\Coverity\bin\cov-build.exe" `
+      #                       -ArgumentList @(
+      #                           "--dir",
+      #                           "${{ env.COVERITY_INTERMEDIATE_DIR }}",
+      #                           "`"$env:MSBUILD_PATH`" GitHub_VS2022_Test_Project.sln /p:Configuration=`"Release`" /t:Rebuild /nodeReuse:false" # $buildCommandString 대신 직접 삽입
+      #                       ) `
+      #                       -Wait -NoNewWindow `
+      #                       | Out-Null # Start-Process 객체가 로그에 출력되는 것을 방지
+      #         $exitCode = $LASTEXITCODE
+      #     } catch {
+      #         Write-Error "ERROR: cov-build 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999 }
+          
+      #     if ($exitCode -ne 0) {
+      #         Write-Error "ERROR: Coverity 빌드 캡처 실패. 종료 코드: $exitCode"
+              
+      #         # 실패 시 idir 폴더 존재 여부만 확인
+      #         Write-Host "--- idir 폴더 존재 여부 확인 ---"
+      #         if (Test-Path $env:COVERITY_INTERMEDIATE_DIR) {
+      #             Write-Host "idir 폴더가 존재합니다. 내용 확인:"
+      #             Get-ChildItem -Path $env:COVERITY_INTERMEDIATE_DIR -Recurse -Depth 2 | Format-Table Name, Length, Mode -AutoSize # 깊이 2단계까지 확인
+      #         } else {
+      #             Write-Host "idir 폴더가 존재하지 않습니다."
+      #         }
+      #         Write-Host "--------------------------------"
+      #         exit 1 
+      #     }
+      #     Write-Host "Coverity 빌드 캡처 완료. (종료 코드: $exitCode)"
+
           Write-Host "Coverity 빌드 캡처 시작..."
-          try {
-              Start-Process -FilePath "C:\Program Files\Coverity\bin\cov-build.exe" `
-                            -ArgumentList @(
-                                "--dir",
-                                "${{ env.COVERITY_INTERMEDIATE_DIR }}",
-                                "`"$env:MSBUILD_PATH`" GitHub_VS2022_Test_Project.sln /p:Configuration=`"Release`" /t:Rebuild /nodeReuse:false" # $buildCommandString 대신 직접 삽입
-                            ) `
-                            -Wait -NoNewWindow `
-                            | Out-Null # Start-Process 객체가 로그에 출력되는 것을 방지
-              $exitCode = $LASTEXITCODE
-          } catch {
-              Write-Error "ERROR: cov-build 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999 }
-          
+
+          $covCmd = @(
+              "--dir", "${{ env.COVERITY_INTERMEDIATE_DIR }}",
+              "`"$env:MSBUILD_PATH`" GitHub_VS2022_Test_Project.sln /p:Configuration=`"Release`" /t:Rebuild /nodeReuse:false"
+          )
+
+          & "C:\Program Files\Coverity\bin\cov-build.exe" @covCmd
+          $exitCode = $LASTEXITCODE
+
           if ($exitCode -ne 0) {
               Write-Error "ERROR: Coverity 빌드 캡처 실패. 종료 코드: $exitCode"
-              
-              # 실패 시 idir 폴더 존재 여부만 확인
-              Write-Host "--- idir 폴더 존재 여부 확인 ---"
               if (Test-Path $env:COVERITY_INTERMEDIATE_DIR) {
-                  Write-Host "idir 폴더가 존재합니다. 내용 확인:"
-                  Get-ChildItem -Path $env:COVERITY_INTERMEDIATE_DIR -Recurse -Depth 2 | Format-Table Name, Length, Mode -AutoSize # 깊이 2단계까지 확인
+                  Write-Host "--- idir 폴더 존재함. 내용:"
+                  Get-ChildItem -Path $env:COVERITY_INTERMEDIATE_DIR -Recurse -Depth 2 | Format-Table Name, Length, Mode -AutoSize
               } else {
                   Write-Host "idir 폴더가 존재하지 않습니다."
               }
-              Write-Host "--------------------------------"
-              exit 1 
+              exit 1
           }
+
           Write-Host "Coverity 빌드 캡처 완료. (종료 코드: $exitCode)"
 
 
