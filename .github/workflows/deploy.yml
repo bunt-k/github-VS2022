@@ -313,9 +313,6 @@ jobs:
           
           Write-Host "Coverity 결함 커밋 완료. (종료 코드: $exitCode)"
 
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
       - name: Black Duck SCA scan
         uses: blackduck-inc/black-duck-security-scan@805cbd09e806b01907bbea0f990723c2bb85abe9
         with:
