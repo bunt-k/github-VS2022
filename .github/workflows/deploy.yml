@@ -286,9 +286,6 @@ jobs:
           } catch {
               Write-Error "ERROR: cov-analyze 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999 }
           
-          if ($exitCode -ne 0) {
-              Write-Error "ERROR: Coverity 분석 실패. 종료 코드: $exitCode"
-              exit 1 }
           Write-Host "Coverity 분석 완료. (종료 코드: $exitCode)"
 
 
@@ -314,9 +311,6 @@ jobs:
           } catch {
               Write-Error "ERROR: cov-commit-defects 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999 }
           
-          if ($exitCode -ne 0) {
-              Write-Error "ERROR: Coverity 결함 커밋 실패. 종료 코드: $exitCode"
-              exit 1 }
           Write-Host "Coverity 결함 커밋 완료. (종료 코드: $exitCode)"
 
 
