@@ -256,6 +256,7 @@ jobs:
               "`"$env:MSBUILD_PATH`" GitHub_VS2022_Test_Project.sln /p:Configuration=`"Release`" /t:Rebuild /nodeReuse:false"
           )
 
+
           & "C:\Program Files\Coverity\bin\cov-build.exe" @covCmd
           $exitCode = $LASTEXITCODE
           
