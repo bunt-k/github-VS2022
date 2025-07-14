@@ -231,7 +231,7 @@ jobs:
             Write-Error "ERROR: MSBuild 경로를 찾을 수 없습니다."; exit 1 }
           
           # MSBuild 명령어 문자열
-          # $buildCommandString = "`"$env:MSBUILD_PATH`" GitHub_VS2022_Test_Project.sln /p:Configuration=`"Release`" /t:Rebuild"
+          # $buildCommandString = "`"$env:MSBUILD_PATH`" GitHub_VS2022_Test_Project.sln /p:Configuration=`"Release`" /t:Rebuild "
           
           # -----------------------------------------------------
           # 수정된 부분: 로그 관련 변수 및 리다이렉션 완전히 삭제
@@ -243,7 +243,7 @@ jobs:
                             -ArgumentList @(
                                 "--dir",
                                 "${{ env.COVERITY_INTERMEDIATE_DIR }}",
-                                "`"$env:MSBUILD_PATH`" GitHub_VS2022_Test_Project.sln /p:Configuration=`"Release`" /t:Rebuild" # $buildCommandString 대신 직접 삽입
+                                "`"$env:MSBUILD_PATH`" GitHub_VS2022_Test_Project.sln /p:Configuration=`"Release`" /t:Rebuild /nodeReuse:false" # $buildCommandString 대신 직접 삽입
                             ) `
                             -Wait -NoNewWindow `
                             | Out-Null # Start-Process 객체가 로그에 출력되는 것을 방지
@@ -319,6 +319,8 @@ jobs:
 
 
 
-          #  msbuild GitHub_VS2022_Test_Project.sln /p:Configuration=Release /t:Rebuild
-          # env:
-          # COVERITY_LICENSE_CONTENT: ${{ secrets.COVERITY_ANALYSIS_LICENSE }}
+#  msbuild GitHub_VS2022_Test_Project.sln /p:Configuration=Release /t:Rebuild
+# env:
+# COVERITY_LICENSE_CONTENT: ${{ secrets.COVERITY_ANALYSIS_LICENSE }}
+
+# C:\Program Files\Coverity\node\node.exe C:\Program Files\Coverity\SARIF/cov-format-sarif-for-github.js --input
