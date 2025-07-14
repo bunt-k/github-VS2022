@@ -16,6 +16,7 @@ env:
   INSTALLER_NAME: cov-analysis-win64-2024.12.1.exe # 다운로드될 파일명
   INSTALLER_VERSION: 2024.12.1 # <--- 설치 파일의 버전이 바뀔 때마다 이 값을 변경
   COVERITY_ORIGINAL_INSTALLER_NAME: cov-analysis-win64-2024.12.1.exe
+  COVERITY_INTERMEDIATE_DIR: idir
 
 jobs:
   Build-And-Analysis:
@@ -223,8 +224,6 @@ jobs:
       # Coverity Build Capture and Solution Build
       - name: Coverity Build Capture and Solution Build
         shell: pwsh
-        env:
-          COVERITY_INTERMEDIATE_DIR: idir # Coverity 중간 디렉토리
         run: |
           # MSBuild 경로 확인
           if (-not (Test-Path $env:MSBUILD_PATH)) {
@@ -255,8 +254,6 @@ jobs:
       # Coverity Analyze 실행
       - name: Coverity Analyze
         shell: pwsh
-        env:
-          COVERITY_INTERMEDIATE_DIR: idir # Coverity 중간 디렉토리
         run: |
           Write-Host "Coverity 분석 시작..."
           try {
@@ -274,8 +271,6 @@ jobs:
       # Coverity JSON 결과 생성 (SARIF 변환을 위해 필요)
       - name: Generate Coverity JSON Report
         shell: pwsh
-        env:
-          COVERITY_INTERMEDIATE_DIR: idir
         run: |
           Write-Host "Coverity JSON 결과 생성 시작..."
           try {
@@ -294,53 +289,38 @@ jobs:
           Write-Host "Coverity JSON 결과 생성 완료. (종료 코드: $exitCode)"
 
 
-      # Coverity JSON을 GitHub용 SARIF로 변환
-      - name: Convert Coverity JSON to SARIF for GitHub
+
+      # Coverity JSON 결과 생성 (SARIF 변환을 위해 필요)
+      - name: Generate Coverity JSON Report
         shell: pwsh
         run: |
-          # Coverity Node.js 실행 파일 및 SARIF 스크립트 경로
-          # 실제 Coverity 설치 경로에 맞춰 수정해주세요.
-          # 기본 설치 경로를 가정합니다.
-          $nodeExePath = "C:\Program Files\Coverity\Coverity Static Analysis\node\node.exe"
-          $sarifScriptPath = "C:\Program Files\Coverity\Coverity Static Analysis\SARIF\cov-format-sarif-for-github.js"
-          
-          # SARIF 스크립트 입력 및 출력 파일 이름
-          $sarifInputFile = "coverity_results.json" # cov-format-errors에서 생성된 파일
-          $sarifOutputFile = "coverity-results.sarif"
-          
-          # GitHub 저장소 정보 (환경 변수 사용)
-          $repoName = "${{ github.repository }}" # 예: 'bunt-k/Ctest'
-          $checkoutPath = "${{ github.workspace }}" # 소스 코드가 체크아웃된 경로
-          $commitHash = "${{ github.sha }}" # 현재 커밋 해시
-
-          Write-Host "Coverity JSON을 SARIF로 변환 시작..."
+          Write-Host "Coverity JSON 결과 생성 시작..."
           try {
-              # PowerShell의 '--%' (stop-parsing) 기호를 사용하여 node.exe에 인수를 정확히 전달
-              # 이렇게 하면 PowerShell이 인수를 잘못 해석하는 것을 방지합니다.
-              & $nodeExePath --% $sarifScriptPath `
-                  --inputFile $sarifInputFile `
-                  --outputFile $sarifOutputFile `
-                  --githubUrl "https://github.com" `
-                  --repoName $repoName `
-                  --checkoutPath $repoName $checkoutPath $commitHash
+              Start-Process -FilePath "C:\Program Files\Coverity\bin\cov-format-errors.exe" `
+                              -ArgumentList @(
+                                  "--dir", "${{ env.COVERITY_INTERMEDIATE_DIR }}",
+                                  "--json-output-v10",
+                                  "--output-file", "coverity_results.json" # SARIF 스크립트의 입력 파일
+                              ) `
+                              -Wait -NoNewWindow `
+                              | Out-Null
               $exitCode = $LASTEXITCODE
           } catch {
-              Write-Error "ERROR: cov-format-sarif-for-github.js 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999
+              Write-Error "ERROR: cov-format-errors 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999
           }
-          Write-Host "SARIF 변환 완료. (종료 코드: $exitCode)"
+          Write-Host "Coverity JSON 결과 생성 완료. (종료 코드: $exitCode)"
+
 
       # SARIF 파일을 GitHub Code Scanning에 업로드
       - name: Upload SARIF to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: coverity-results.sarif # 위 단계에서 생성된 SARIF 파일 경로
-          
+
 
       # Coverity Commit Defects 실행
       - name: Coverity Commit Defects
         shell: pwsh
-        env:
-          COVERITY_INTERMEDIATE_DIR: idir # Coverity 중간 디렉토리
         run: |
           Write-Host "Coverity 결함 커밋 시작..."
           try {
