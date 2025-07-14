@@ -227,38 +227,40 @@ jobs:
         run: |
           if (-not (Test-Path $env:MSBUILD_PATH)) {
             Write-Error "ERROR: MSBuild 경로를 찾을 수 없습니다."; exit 1 }
-          New-Item -ItemType Directory -Path $env:COVERITY_INTERMEDIATE_DIR -Force | Out-Null
+          New-Item -ItemType Directory -Path $env:COVERITY_INTERMEDIATE_DIR -Force | Out-Null          
           
-          # MSBuild 명령 문자열을 구성합니다.
-          # 이 문자열은 MSBuild.exe의 경로와 빌드 인자들을 포함합니다.
-          # 최종적으로 cov-build가 실행할 명령이 됩니다.
-          $msbuildCommand = "`"$env:MSBUILD_PATH`" Project.sln /p:Configuration=`"Release`""
+          # -----------------------------------------------------
+          # 수정된 부분: MSBuild 명령어 문자열
+          # 'GitHub_VS2022_Test_Project.sln' 솔루션 파일과 '/t:Rebuild' 인자 추가
+          # -----------------------------------------------------
+          $buildCommandString = "`"$env:MSBUILD_PATH`" GitHub_VS2022_Test_Project.sln /p:Configuration=`"Release`" /t:Rebuild"
           
-          Write-Host "MSBUILD Command to be captured: $msbuildCommand"
+          $covBuildLogOutput = "cov_build_stdout.log"
+          $covBuildLogError = "cov_build_stderr.log"
 
           try {
-              # Start-Process를 사용하여 cov-build를 실행합니다.
-              # ArgumentList에 각 인자를 명확하게 분리하여 전달합니다.
-              # 핵심 변경: $msbuildCommand 변수 자체를 한 번 더 `"`로 감싸서
-              # cov-build에게 "하나의" 인자로 전달되도록 합니다.
-              # 이때 `"` 앞에 PowerShell 이스케이프 문자(`)를 붙여야 합니다.
+              Write-Host "Coverity 빌드 캡처 시작..."
               Start-Process -FilePath "C:\Program Files\Coverity\bin\cov-build.exe" `
                             -ArgumentList @(
                                 "--dir",
                                 "${{ env.COVERITY_INTERMEDIATE_DIR }}",
-                                "`"$msbuildCommand`"" # <--- 최종 변경 지점: `"`를 사용한 명시적 이스케이프
+                                $buildCommandString
                             ) `
                             -Wait -NoNewWindow `
+                            -RedirectStandardOutput $covBuildLogOutput `
+                            -RedirectStandardError $covBuildLogError `
+                            | Out-Null
               $exitCode = $LASTEXITCODE
           } catch {
-              Write-Error "cov-build 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999
-          }
+              Write-Error "ERROR: cov-build 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999 }
           
           if ($exitCode -ne 0) {
-              Write-Error "Coverity 빌드 캡처 실패. 종료 코드: $exitCode"
-              # $covBuildLogOutput, $covBuildLogError 변수가 여전히 정의되지 않았을 수 있습니다.
-              # 이 부분을 제거하거나 실제 로그 파일 경로로 교체해야 합니다.
-              # if (Test-Path $covBuildLogOutput) { Get-Content $covBuildLogOutput | Write-Host }
-              # if (Test-Path $covBuildLogError) { Get-Content $covBuildLogError | Write-Host }
-              exit 1
-          }
+              Write-Error "ERROR: Coverity 빌드 캡처 실패. 종료 코드: $exitCode"
+              if (Test-Path $covBuildLogOutput) { Get-Content $covBuildLogOutput | Write-Host }
+              if (Test-Path $covBuildLogError) { Get-Content $covBuildLogError | Write-Host }
+              exit 1 }
+          Write-Host "Coverity 빌드 캡처 완료. (종료 코드: $exitCode)"
+
+
+
+          #  msbuild GitHub_VS2022_Test_Project.sln /p:Configuration=Release /t:Rebuild
