@@ -309,7 +309,7 @@ jobs:
           $commitHash = "${{ github.sha }}" # 현재 커밋 해시
 
           try {
-              Start-Process -FilePath $nodeExePath ` # <-- 여기 따옴표 수정됨
+              Start-Process -FilePath $nodeExePath `
                             -ArgumentList @(
                                 $sarifScriptPath,
                                 "--inputFile", $sarifInputFile,
