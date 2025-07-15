@@ -433,6 +433,15 @@ jobs:
           
           Write-Host "SARIF 파일 URI 스키마 수정 완료."
       
+
+
+      # SARIF 파일을 GitHub Code Scanning에 업로드
+      - name: Upload SARIF to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: coverity-results.sarif # 위 단계에서 생성된 SARIF 파일 경로
+
+
       # Coverity Commit Defects 실행
       - name: Coverity Commit Defects
         shell: pwsh
