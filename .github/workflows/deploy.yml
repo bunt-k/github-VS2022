@@ -347,6 +347,94 @@ jobs:
           }
 
 
+
+      # SARIF 파일 내 URI 형식 수정 (Windows 절대 경로 -> file:/// URI)
+      - name: Fix SARIF URI Scheme for GitHub
+        shell: pwsh
+        run: |
+          $sarifFile = "coverity-results.sarif"
+          
+          if (-not (Test-Path $sarifFile)) {
+              Write-Error "ERROR: SARIF 파일을 찾을 수 없습니다: $sarifFile. 이전 단계에서 파일이 생성되지 않았습니다."
+              exit 1
+          }
+
+          Write-Host "SARIF 파일 URI 스키마 수정 시작..."
+          
+          # SARIF 파일 내용을 읽어옴
+          $content = Get-Content $sarifFile -Raw
+          
+          # JSON 파싱
+          try {
+              $sarifJson = ConvertFrom-Json $content
+          } catch {
+              Write-Error "ERROR: SARIF 파일을 JSON으로 파싱할 수 없습니다. 파일이 유효한 JSON 형식이 아닐 수 있습니다."
+              exit 1
+          }
+
+          # 모든 'artifactLocation.uri' 필드를 순회하며 경로 수정
+          # C:\ -> file:///C:/, D:\ -> file:///D:/ 등
+          # 또한 백슬래시를 포워드 슬래시로 변환
+          $sarifJson.runs | ForEach-Object {
+              if ($_.results) {
+                  $_.results | ForEach-Object {
+                      if ($_.locations) {
+                          $_.locations | ForEach-Object {
+                              if ($_.physicalLocation -and $_.physicalLocation.artifactLocation -and $_.physicalLocation.artifactLocation.uri) {
+                                  $originalUri = $_.physicalLocation.artifactLocation.uri
+                                  $modifiedUri = $originalUri
+                                  
+                                  # Windows 드라이브 문자 (C:, D: 등)로 시작하는지 확인
+                                  if ($originalUri -match "^[A-Za-z]:[/\\]") {
+                                      # 백슬래시를 포워드 슬래시로 변환
+                                      $modifiedUri = $modifiedUri.Replace('\', '/')
+                                      # 'C:/path' -> 'file:///C:/path' 형식으로 변환
+                                      $modifiedUri = "file:///" + $modifiedUri
+                                  }
+                                  
+                                  # URI가 여전히 백슬래시를 포함하고 있다면 추가 변환 (안전 장치)
+                                  $modifiedUri = $modifiedUri.Replace('\', '/')
+
+                                  # 수정된 URI 적용
+                                  $_.physicalLocation.artifactLocation.uri = $modifiedUri
+                              }
+                          }
+                      }
+                      # codeFlows 내의 locations도 수정
+                      if ($_.codeFlows) {
+                          $_.codeFlows | ForEach-Object {
+                              if ($_.threadFlows) {
+                                  $_.threadFlows | ForEach-Object {
+                                      if ($_.locations) {
+                                          $_.locations | ForEach-Object {
+                                              if ($_.location -and $_.location.physicalLocation -and $_.location.physicalLocation.artifactLocation -and $_.location.physicalLocation.artifactLocation.uri) {
+                                                  $originalUri = $_.location.physicalLocation.artifactLocation.uri
+                                                  $modifiedUri = $originalUri
+                                                  
+                                                  if ($originalUri -match "^[A-Za-z]:[/\\]") {
+                                                      $modifiedUri = $modifiedUri.Replace('\', '/')
+                                                      $modifiedUri = "file:///" + $modifiedUri
+                                                  }
+                                                  $modifiedUri = $modifiedUri.Replace('\', '/')
+                                                  $_.location.physicalLocation.artifactLocation.uri = $modifiedUri
+                                              }
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+
+          # 수정된 JSON 내용을 파일에 다시 저장
+          $sarifJson | ConvertTo-Json -Depth 100 -Compress | Set-Content $sarifFile
+          
+          Write-Host "SARIF 파일 URI 스키마 수정 완료."
+      
+
+
       # SARIF 파일을 GitHub Code Scanning에 업로드
       - name: Upload SARIF to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v3
