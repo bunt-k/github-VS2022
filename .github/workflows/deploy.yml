@@ -289,25 +289,22 @@ jobs:
           Write-Host "Coverity JSON 결과 생성 완료. (종료 코드: $exitCode)"
 
 
-      # Coverity JSON 결과 생성 (SARIF 변환을 위해 필요)
-      - name: Generate Coverity JSON Report
+      # JSON to SARIF
+      - name: JSON File Covert to SARIF
         shell: pwsh
         run: |
-          Write-Host "Coverity JSON 결과 생성 시작..."
+          Write-Host "JSON File Covert to SARIF"
           try {
-              Start-Process -FilePath "C:\Program Files\Coverity\bin\cov-format-errors.exe" `
-                              -ArgumentList @(
-                                  "--dir", "${{ env.COVERITY_INTERMEDIATE_DIR }}",
-                                  "--json-output-v10",
-                                  "--output-file", "coverity_results.json" # SARIF 스크립트의 입력 파일
-                              ) `
-                              -Wait -NoNewWindow `
-                              | Out-Null
+              Start-Process -FilePath ""C:\Program Files\Coverity\Coverity Static Analysis\node\node.exe" `
+                            -ArgumentList "C:\Program Files\Coverity\Coverity Static Analysis\SARIF\cov-format-sarif-for-github.js", 
+                            "--dir", "${{ env.COVERITY_INTERMEDIATE_DIR }}" `
+                            -Wait -NoNewWindow `
+                            | Out-Null
               $exitCode = $LASTEXITCODE
           } catch {
-              Write-Error "ERROR: cov-format-errors 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999
-          }
-          Write-Host "Coverity JSON 결과 생성 완료. (종료 코드: $exitCode)"
+              Write-Error "ERROR: cov-format-sarif-for-github.js 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999 }
+          
+          Write-Host "JSON File Covert to SARIF 완료. (종료 코드: $exitCode)"
 
 
       # SARIF 파일을 GitHub Code Scanning에 업로드
@@ -328,7 +325,7 @@ jobs:
                                 "--dir", "${{ env.COVERITY_INTERMEDIATE_DIR }}",
                                 "--url", "https://coverity.smsolus.com",
                                 "--user", "admin",
-                                "--password", "${{ secrets.COVERITY_CONNECT_PW }}", # <-- 여기 수정됨
+                                "--password", "${{ secrets.COVERITY_CONNECT_PW }}",
                                 "--stream", "github-VS2022"
                             ) `
                             -Wait -NoNewWindow `
