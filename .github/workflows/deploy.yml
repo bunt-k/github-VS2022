@@ -293,16 +293,37 @@ jobs:
       - name: JSON File Covert to SARIF
         shell: pwsh
         run: |
-          Write-Host "JSON File Covert to SARIF"
+          Write-Host "JSON File Covert to SARIF 시작..."
+          
+          # Coverity Node.js 실행 파일 및 SARIF 스크립트 경로
+          $nodeExePath = "C:\Program Files\Coverity\Coverity Static Analysis\node\node.exe"
+          $sarifScriptPath = "C:\Program Files\Coverity\Coverity Static Analysis\SARIF\cov-format-sarif-for-github.js"
+          
+          # SARIF 스크립트 입력 및 출력 파일 이름
+          $sarifInputFile = "coverity_results.json" # cov-format-errors에서 생성된 파일
+          $sarifOutputFile = "coverity-results.sarif"
+          
+          # GitHub 저장소 정보 (환경 변수 사용)
+          $repoName = "${{ github.repository }}" # 예: 'bunt-k/Ctest'
+          $checkoutPath = "${{ github.workspace }}" # 소스 코드가 체크아웃된 경로
+          $commitHash = "${{ github.sha }}" # 현재 커밋 해시
+
           try {
-              Start-Process -FilePath ""C:\Program Files\Coverity\Coverity Static Analysis\node\node.exe" `
-                            -ArgumentList "C:\Program Files\Coverity\Coverity Static Analysis\SARIF\cov-format-sarif-for-github.js", 
-                            "--dir", "${{ env.COVERITY_INTERMEDIATE_DIR }}" `
+              Start-Process -FilePath $nodeExePath ` # <-- 여기 따옴표 수정됨
+                            -ArgumentList @(
+                                $sarifScriptPath,
+                                "--inputFile", $sarifInputFile,
+                                "--outputFile", $sarifOutputFile,
+                                "--githubUrl", "https://github.com",
+                                "--repoName", $repoName,
+                                "--checkoutPath", $repoName, $checkoutPath, $commitHash
+                            ) `
                             -Wait -NoNewWindow `
                             | Out-Null
               $exitCode = $LASTEXITCODE
           } catch {
-              Write-Error "ERROR: cov-format-sarif-for-github.js 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999 }
+              Write-Error "ERROR: cov-format-sarif-for-github.js 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999
+          }
           
           Write-Host "JSON File Covert to SARIF 완료. (종료 코드: $exitCode)"
 
