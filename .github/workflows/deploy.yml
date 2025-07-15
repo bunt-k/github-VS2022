@@ -296,8 +296,8 @@ jobs:
           Write-Host "JSON File Covert to SARIF 시작..."
           
           # Coverity Node.js 실행 파일 및 SARIF 스크립트 경로
-          $nodeExePath = "C:\Program Files\Coverity\Coverity Static Analysis\node\node.exe"
-          $sarifScriptPath = "C:\Program Files\Coverity\Coverity Static Analysis\SARIF\cov-format-sarif-for-github.js"
+          $nodeExePath = "C:\Program Files\Coverity\node\node.exe"
+          $sarifScriptPath = "C:\Program Files\Coverity\SARIF\cov-format-sarif-for-github.js"
           
           # SARIF 스크립트 입력 및 출력 파일 이름
           $sarifInputFile = "coverity_results.json" # cov-format-errors에서 생성된 파일
