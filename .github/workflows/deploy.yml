@@ -303,9 +303,11 @@ jobs:
           $sarifInputFile = "coverity_results.json" # cov-format-errors에서 생성된 파일
           $sarifOutputFile = "coverity-results.sarif"
           
+
           # GitHub 저장소 정보 (환경 변수 사용)
           $repoName = "${{ github.repository }}" # 예: 'bunt-k/Ctest'
-          $checkoutPath = "${{ github.workspace }}" # 소스 코드가 체크아웃된 경로
+          $checkoutPathRaw = "${{ github.workspace }}" # 예: D:\a\github-VS2022\github-VS2022
+          $checkoutPath = $checkoutPathRaw.Replace('\', '/') # <-- 여기 수정됨
           $commitHash = "${{ github.sha }}" # 현재 커밋 해시
 
           try {
