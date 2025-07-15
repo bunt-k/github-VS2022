@@ -309,23 +309,40 @@ jobs:
           $commitHash = "${{ github.sha }}" # 현재 커밋 해시
 
           try {
-              Start-Process -FilePath $nodeExePath `
-                            -ArgumentList @(
-                                $sarifScriptPath,
-                                "--inputFile", $sarifInputFile,
-                                "--outputFile", $sarifOutputFile,
-                                "--githubUrl", "https://github.com",
-                                "--repoName", $repoName,
-                                "--checkoutPath", $repoName, $checkoutPath, $commitHash
-                            ) `
-                            -Wait -NoNewWindow `
-                            | Out-Null
-              $exitCode = $LASTEXITCODE
+              # Construct the argument list as an array
+              # 스크립트 경로를 큰따옴표로 감싸서 공백이 있는 경로를 올바르게 처리
+              $arguments = @(
+                  "`"$sarifScriptPath`"",
+                  "--inputFile", $sarifInputFile,
+                  "--outputFile", $sarifOutputFile,
+                  "--githubUrl", "https://github.com",
+                  "--repoName", $repoName,
+                  "--checkoutPath", $repoName, $checkoutPath, $commitHash
+              )
+
+              Write-Host "Executing Node.js with arguments: $($arguments -join ' ')" # 진단 출력
+
+              # Start-Process를 사용하여 인수를 배열로 전달
+              $process = Start-Process -FilePath $nodeExePath `
+                                       -ArgumentList $arguments `
+                                       -Wait -PassThru `
+                                       -NoNewWindow # 새 창이 뜨지 않도록 함
+              
+              $process.WaitForExit() # 프로세스 종료 대기
+              $exitCode = $process.ExitCode
+              
+              Write-Host "JSON File Covert to SARIF 완료. (종료 코드: $exitCode)"
+
+              # # Node.js 스크립트의 종료 코드가 0이 아니면 스텝을 실패시킴
+              # if ($exitCode -ne 0) {
+              #     Write-Error "ERROR: cov-format-sarif-for-github.js 스크립트가 오류와 함께 종료되었습니다. 종료 코드: $exitCode"
+              #     exit 1 # 스텝 실패
+              # }
+
           } catch {
               Write-Error "ERROR: cov-format-sarif-for-github.js 호출 중 예외 발생: $($_.Exception.Message)"; $exitCode = 9999
+              exit 1 # 예외 발생 시 스텝 실패
           }
-          
-          Write-Host "JSON File Covert to SARIF 완료. (종료 코드: $exitCode)"
 
 
       # SARIF 파일을 GitHub Code Scanning에 업로드
